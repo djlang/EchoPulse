@@ -10,6 +10,7 @@ import AudioKitEX
 import SoundpipeAudioKit // 提供高精度频率检测算法
 import Foundation
 import Combine
+import AVFAudio
 
 class TunerEngine: ObservableObject {
     private let engine = AudioEngine()
@@ -49,5 +50,25 @@ class TunerEngine: ObservableObject {
     func stop() {
         engine.stop()
         tracker?.stop()
+    }
+}
+
+extension TunerEngine {
+    func checkMicPermission(completion: @escaping (Bool) -> Void) {
+        let session = AVAudioSession.sharedInstance()
+        switch session.recordPermission {
+        case .granted:
+            completion(true)
+        case .denied:
+            completion(false)
+        case .undetermined:
+            session.requestRecordPermission { granted in
+                DispatchQueue.main.async {
+                    completion(granted)
+                }
+            }
+        @unknown default:
+            completion(false)
+        }
     }
 }

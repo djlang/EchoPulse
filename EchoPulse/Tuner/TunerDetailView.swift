@@ -34,12 +34,21 @@ struct TunerDetailView: View {
 
             // 底部弦指示器 (这里可以用 HStack 渲染吉他的 6 根弦)
             HStack(spacing: 12) {
-                ForEach(["E2", "A2", "D3", "G3", "B3", "E4"], id: \.self) { note in
+                let notes = ["E2", "A2", "D3", "G3", "B3", "E4"]
+                ForEach(notes, id: \.self) { note in
                     Text(note)
                         .font(.system(.body, design: .monospaced))
+                        .foregroundColor(detailVM.selectedNoteKey == note ? .white : .primary)
                         .frame(width: 45, height: 45)
-                        .background(detailVM.currentNote == note.prefix(1) ? Color.orange : Color.gray.opacity(0.2))
+                        .background(detailVM.selectedNoteKey == note ? Color.orange : Color.gray.opacity(0.2))
                         .clipShape(Circle())
+                        .onTapGesture {
+                            // 点击切换参考弦
+                            detailVM.selectedNoteKey = note
+                            // 震动反馈 (Haptic Feedback)
+                            let impact = UIImpactFeedbackGenerator(style: .medium)
+                            impact.impactOccurred()
+                        }
                 }
             }
             .padding(.bottom, 30)

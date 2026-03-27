@@ -16,8 +16,8 @@ class TunerViewModel: ObservableObject {
     // @Published var noteName: String = "-"
     
     @Published var pitchOffset: Double = 0.0
-    @Published var currentNote: String = "E"
-    
+    @Published var currentNote: String = "E2" //默认选中六弦
+    @Published var selectedNoteKey: String = "E2"
     private let engine = TunerEngine()
     
     // 标准音频率表 (简化版)
@@ -45,17 +45,26 @@ class TunerViewModel: ObservableObject {
     }
     
     private func analyze(frequency: Double) {
-        // 1. 寻找最接近的标准弦频率
-        guard let closest = standardNotes.min(by: { abs($0.value - frequency) < abs($1.value - frequency) }) else { return }
+        // 获取当前手动选中的那根弦的频率进行对比
+        guard let targetFrequency = standardNotes[selectedNoteKey] else { return }
         
-        // 2. 计算音分偏移
-        // Formula: 1200 * log2(f1 / f2)
-        let offset = 1200 * log2(frequency / closest.value)
+        let offset = 1200 * log2(frequency / targetFrequency)
         
-        // 3. 更新 UI (限制在 -50 到 50 之间)
-        self.pitchOffset = max(-50, min(50, offset))
-        self.currentNote = String(closest.key.prefix(1)) // 只显示音名 E, A, D...
+        DispatchQueue.main.async {
+            self.pitchOffset = max(-50, min(50, offset))
+            // 更新当前音名显示
+            self.currentNote = String(self.selectedNoteKey.prefix(1))
+        }
     }
 
-    func start() { engine.start() }
+    func start() {
+        engine.checkMicPermission { [weak self] granted in
+            if granted {
+                self?.engine.start()
+            } else {
+                // 这里可以弹出一个 Alert 提示用户去设置开启权限
+                print("用户拒绝了麦克风权限")
+            }
+        }
+    }
 }
