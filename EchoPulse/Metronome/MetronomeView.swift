@@ -9,13 +9,25 @@ import SwiftUI
 struct MetronomeView: View {
     @StateObject private var viewModel = MetronomeViewModel()
     @State private var pendulumStartDate = Date()
+    
+    private var metallicSilver: LinearGradient {
+        LinearGradient(
+            colors: [
+                Color(white: 0.85),
+                Color(white: 0.95),
+                Color(white: 0.75)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 24) {
                 VStack(spacing: 10) {
                     Text("\(viewModel.bpm) BPM")
-                        .font(.system(size: 56, weight: .bold, design: .monospaced))
+                        .font(.system(size: 46, weight: .bold, design: .monospaced))
 
                     Picker("样式", selection: $viewModel.style) {
                         ForEach(MetronomeViewModel.Style.allCases) { style in
@@ -159,7 +171,7 @@ struct MetronomeView: View {
 
                         // Pivot marker (not rotating).
                         Circle()
-                            .fill(Color(.systemGray2))
+                            .fill(metallicSilver)
                             .frame(width: 10, height: 10)
                             .overlay {
                                 Circle()
@@ -217,6 +229,18 @@ private struct PendulumNeedleView: View {
     let rodLength: CGFloat
     let rodWidth: CGFloat
     let bobDiameter: CGFloat
+    
+    private var metallicSilver: LinearGradient {
+        LinearGradient(
+            colors: [
+                Color(white: 0.85),
+                Color(white: 0.95),
+                Color(white: 0.75)
+            ],
+            startPoint: .topLeading,
+            endPoint: .bottomTrailing
+        )
+    }
 
     var body: some View {
         // Coordinate system for drawing:
@@ -226,11 +250,10 @@ private struct PendulumNeedleView: View {
         let sliderWidth = max(18, bobDiameter)
         let sliderHeight: CGFloat = 14
         let sliderCenterY = -(rodLength * 2.0 / 3.0) // 1/3 down from the top
-
         ZStack {
             // Rod (silver)
             RoundedRectangle(cornerRadius: 2)
-                .fill(Color(.systemGray3))
+                .fill(metallicSilver)
                 .frame(width: rodWidth, height: rodLength)
                 .overlay {
                     RoundedRectangle(cornerRadius: 2)
@@ -240,7 +263,7 @@ private struct PendulumNeedleView: View {
 
             // BPM slider weight (silver block on the rod)
             RoundedRectangle(cornerRadius: 6, style: .continuous)
-                .fill(Color(.systemGray2))
+                .fill(metallicSilver)
                 .frame(width: sliderWidth, height: sliderHeight)
                 .overlay {
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
@@ -251,8 +274,12 @@ private struct PendulumNeedleView: View {
 
             // Small top tip
             Circle()
-                .fill(Color(.systemGray4))
+                .fill(metallicSilver)
                 .frame(width: topTipDiameter, height: topTipDiameter)
+                .overlay {
+                    Circle()
+                        .stroke(Color.white.opacity(0.45), lineWidth: 1)
+                }
                 .offset(y: -rodLength)
         }
         .rotationEffect(angle, anchor: .center)
