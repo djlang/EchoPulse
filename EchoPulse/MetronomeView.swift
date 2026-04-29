@@ -23,6 +23,13 @@ struct MetronomeView: View {
                         }
                     }
                     .pickerStyle(.segmented)
+                    
+                    Picker("拍号", selection: $viewModel.timeSignature) {
+                        ForEach(MetronomeViewModel.TimeSignature.allCases) { signature in
+                            Text(signature.rawValue).tag(signature)
+                        }
+                    }
+                    .pickerStyle(.segmented)
                 }
 
                 Group {
@@ -109,9 +116,9 @@ struct MetronomeView: View {
                 .fill(Color(.systemGray6))
 
             VStack(spacing: 10) {
-                // Beat indicator (4/4)
+                // Beat indicator
                 HStack(spacing: 10) {
-                    ForEach(0..<4, id: \.self) { i in
+                    ForEach(0..<viewModel.timeSignature.beatsPerBar, id: \.self) { i in
                         Circle()
                             .fill(i == viewModel.currentBeatIndex ? Color.orange : Color.gray.opacity(0.35))
                             .frame(width: i == 0 ? 12 : 9, height: i == 0 ? 12 : 9)
@@ -168,7 +175,7 @@ struct MetronomeView: View {
     }
 
     private var flashView: some View {
-        let isAccent = viewModel.currentBeatIndex == 0
+        let isAccent = viewModel.timeSignature.accentBeatIndices.contains(viewModel.currentBeatIndex)
         let isOn = viewModel.isRunning
         return ZStack {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
@@ -182,7 +189,7 @@ struct MetronomeView: View {
                 .animation(.easeInOut(duration: 0.08), value: viewModel.currentBeatIndex)
 
             HStack(spacing: 10) {
-                ForEach(0..<4, id: \.self) { i in
+                ForEach(0..<viewModel.timeSignature.beatsPerBar, id: \.self) { i in
                     Circle()
                         .fill(i == viewModel.currentBeatIndex ? Color.primary : Color.gray.opacity(0.3))
                         .frame(width: 10, height: 10)
