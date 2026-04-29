@@ -12,7 +12,12 @@ struct TunerDetailView: View {
     let instrument: InstrumentType
     @Environment(\.presentationMode) var presentationMode
     
-    @StateObject private var detailVM = TunerViewModel()
+    @StateObject private var detailVM: TunerViewModel
+    
+    init(instrument: InstrumentType) {
+        self.instrument = instrument
+        _detailVM = StateObject(wrappedValue: TunerViewModel(instrument: instrument))
+    }
     
     var body: some View {
         VStack {
@@ -34,7 +39,7 @@ struct TunerDetailView: View {
 
             // 底部弦指示器 (这里可以用 HStack 渲染吉他的 6 根弦)
             HStack(spacing: 12) {
-                let notes = ["E2", "A2", "D3", "G3", "B3", "E4"]
+                let notes = instrument.tuningNoteKeys
                 ForEach(notes, id: \.self) { note in
                     Text(note)
                         .font(.system(.body, design: .monospaced))
@@ -55,5 +60,11 @@ struct TunerDetailView: View {
         }
         .navigationTitle("正在调音")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            detailVM.start()
+        }
+        .onDisappear {
+            detailVM.stop()
+        }
     }
 }

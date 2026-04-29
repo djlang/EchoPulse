@@ -26,11 +26,11 @@ struct TunerDashboardView: View {
                     .stroke(Color.secondary.opacity(0.2), style: StrokeStyle(lineWidth: 20, lineCap: .round))
                     .frame(height: 150)
                 
-                // 刻度线 (简单的中心点)
-                Rectangle()
-                    .fill(Color.secondary.opacity(0.5))
-                    .frame(width: 2, height: 30)
-                    .offset(y: -75) // 指向正上方 0 位置
+                // 刻度线
+                GaugeTicksShape(kind: .minor)
+                    .stroke(Color.secondary.opacity(0.25), lineWidth: 2)
+                GaugeTicksShape(kind: .major)
+                    .stroke(Color.secondary.opacity(0.45), lineWidth: 2)
                 
                 // 3. 动态指针
                 Capsule()
@@ -46,7 +46,7 @@ struct TunerDashboardView: View {
             HStack {
                 Text("-50")
                 Spacer()
-                Text("0")
+                Text(formattedOffset)
                     .fontWeight(.bold)
                 Spacer()
                 Text("+50")
@@ -56,4 +56,69 @@ struct TunerDashboardView: View {
             .frame(width: 320)
         }
     }
+    
+    private var formattedOffset: String {
+        let value = Int(viewModel.pitchOffset.rounded())
+        if value == 0 { return "0" }
+        return value > 0 ? "+\(value)" : "\(value)"
+    }
+}
+
+struct GaugeTicksShape: Shape {
+    enum Kind {
+        case minor
+        case major
+    }
+    
+    let kind: Kind
+    
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        
+        let center = CGPoint(x: rect.midX, y: rect.maxY)
+        let radius = rect.width / 2
+        
+        let values: [Int] = {
+            switch kind {
+            case .minor:
+                return Array(stride(from: -50, through: 50, by: 10))
+            case .major:
+                return [-50, -25, 0, 25, 50]
+            }
+        }()
+        
+        for value in values {
+            let tickLength: CGFloat = (kind == .major) ? 18 : 10
+            let inset: CGFloat = 6
+            
+            // Map -50...+50 to 180°...0° (matching GaugeShape semicircle).
+            let angleDegrees = 90 - (Double(value) * 1.8)
+            let theta = angleDegrees * .pi / 180
+            
+            let outerRadius = radius - inset
+            let innerRadius = outerRadius - tickLength
+            
+            let outer = CGPoint(
+                x: center.x + CGFloat(cos(theta)) * outerRadius,
+                y: center.y - CGFloat(sin(theta)) * outerRadius
+            )
+            let inner = CGPoint(
+                x: center.x + CGFloat(cos(theta)) * innerRadius,
+                y: center.y - CGFloat(sin(theta)) * innerRadius
+            )
+            
+            path.move(to: outer)
+            path.addLine(to: inner)
+        }
+        
+        return path
+    }
+}
+
+#Preview {
+    let viewModel = TunerViewModel(instrument: .guitar)
+    viewModel.pitchOffset = 0
+    viewModel.selectedNoteKey = "E2"
+    return TunerDashboardView(viewModel: viewModel)
+        .padding()
 }

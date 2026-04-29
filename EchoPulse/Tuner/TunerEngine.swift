@@ -17,11 +17,13 @@ class TunerEngine: ObservableObject {
     private var mic: AudioEngine.InputNode?
     private var tappableNode: Fader? // 作为一个中间节点
     private var tracker: PitchTap?
+    private var isRunning = false
 
     // 回调给 ViewModel：(频率Hz, 音量Amplitude)
     var onPitchDetected: ((Float, Float) -> Void)?
 
     func start() {
+        guard !isRunning else { return }
         guard let input = engine.input else { return }
         
         // 1. 设置输入并添加一个 Fader（音量设为0，防止回声啸叫）
@@ -42,33 +44,55 @@ class TunerEngine: ObservableObject {
         do {
             try engine.start()
             tracker?.start()
+            isRunning = true
         } catch {
             print("AudioKit 引擎启动失败: \(error)")
         }
     }
 
     func stop() {
-        engine.stop()
+        guard isRunning else { return }
         tracker?.stop()
+        tracker = nil
+        tappableNode = nil
+        engine.stop()
+        isRunning = false
     }
 }
 
 extension TunerEngine {
     func checkMicPermission(completion: @escaping (Bool) -> Void) {
-        let session = AVAudioSession.sharedInstance()
-        switch session.recordPermission {
-        case .granted:
-            completion(true)
-        case .denied:
-            completion(false)
-        case .undetermined:
-            session.requestRecordPermission { granted in
-                DispatchQueue.main.async {
-                    completion(granted)
+        if #available(iOS 17.0, *) {
+            switch AVAudioApplication.shared.recordPermission {
+            case .granted:
+                completion(true)
+            case .denied:
+                completion(false)
+            case .undetermined:
+                AVAudioApplication.requestRecordPermission { granted in
+                    DispatchQueue.main.async {
+                        completion(granted)
+                    }
                 }
+            @unknown default:
+                completion(false)
             }
-        @unknown default:
-            completion(false)
+        } else {
+            let session = AVAudioSession.sharedInstance()
+            switch session.recordPermission {
+            case .granted:
+                completion(true)
+            case .denied:
+                completion(false)
+            case .undetermined:
+                session.requestRecordPermission { granted in
+                    DispatchQueue.main.async {
+                        completion(granted)
+                    }
+                }
+            @unknown default:
+                completion(false)
+            }
         }
     }
 }

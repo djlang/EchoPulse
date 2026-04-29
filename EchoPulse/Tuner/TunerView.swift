@@ -8,10 +8,10 @@ import SwiftUI
 import Combine
 
 struct TunerView: View {
-    @StateObject private var viewModel = TunerViewModel()
+    @State private var presentedInstrument: InstrumentType?
     
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 30) {
                 Text("选择要调音的乐器")
                     .font(.headline)
@@ -20,7 +20,9 @@ struct TunerView: View {
                 
                 // 乐器选择按钮列表
                 ForEach(InstrumentType.allCases) { instrument in
-                    NavigationLink(destination: TunerDetailView(instrument: instrument)) {
+                    Button {
+                        presentedInstrument = instrument
+                    } label: {
                         InstrumentCard(instrument: instrument)
                     }
                 }
@@ -29,6 +31,18 @@ struct TunerView: View {
             }
             .navigationTitle("调音器")
             .padding()
+        }
+        .fullScreenCover(item: $presentedInstrument) { instrument in
+            NavigationStack {
+                TunerDetailView(instrument: instrument)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button("关闭") {
+                                presentedInstrument = nil
+                            }
+                        }
+                    }
+            }
         }
     }
 }
