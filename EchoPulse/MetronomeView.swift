@@ -8,7 +8,7 @@ import SwiftUI
 
 struct MetronomeView: View {
     @StateObject private var viewModel = MetronomeViewModel()
-    @State private var pendulumDirection: Double = -1
+    @State private var pendulumStartDate = Date()
 
     var body: some View {
         NavigationStack {
@@ -86,14 +86,18 @@ struct MetronomeView: View {
             .padding()
             .navigationTitle("节拍器")
         }
-        .onChange(of: viewModel.currentBeatIndex) { _, _ in
-            guard viewModel.isRunning else { return }
-            // 每拍摆一次：左右交替
-            let halfBeat = max(0.12, viewModel.beatDurationSeconds / 2)
-            withAnimation(.easeInOut(duration: halfBeat)) {
-                pendulumDirection *= -1
+        .onChange(of: viewModel.isRunning) { _, _ in
+            if viewModel.isRunning {
+                pendulumStartDate = Date()
             }
         }
+        .onChange(of: viewModel.style) { _, _ in
+            pendulumStartDate = Date()
+        }
+        .onChange(of: viewModel.bpm) { _, _ in
+            pendulumStartDate = Date()
+        }
+        .onAppear { pendulumStartDate = Date() }
         .onDisappear {
             viewModel.stop()
         }
@@ -117,7 +121,6 @@ struct MetronomeView: View {
 
                 GeometryReader { proxy in
                     let size = proxy.size
-                    let angle = Angle.degrees(pendulumDirection * 22)
 
                     ZStack {
                         // Background image (mechanical metronome)
@@ -128,26 +131,34 @@ struct MetronomeView: View {
 
                         // Overlay pendulum needle on top of the image.
                         // Adjust these ratios if the pivot does not align with the image.
-                        let pivot = CGPoint(x: size.width * 0.50, y: size.height * 0.12)
-                        let rodLength = size.height * 0.62
+                        // Inverted style: bob on top, pivot (center) at bottom.
+                        let pivot = CGPoint(x: size.width * 0.50, y: size.height * 0.68)
+                        let rodLength = size.height * 0.48
+                        let bobDiameter: CGFloat = 10
+                        let rodWidth: CGFloat = 5
+                        
+                        TimelineView(.animation) { context in
+                            let phase = pendulumPhase(at: context.date)
+                            let angle = Angle.degrees(phase * 30)
+                            
+                            PendulumNeedleView(
+                                pivot: pivot,
+                                angle: angle,
+                                rodLength: rodLength,
+                                rodWidth: rodWidth,
+                                bobDiameter: bobDiameter
+                            )
+                        }
 
-                        VStack(spacing: 0) {
-                            RoundedRectangle(cornerRadius: 2)
-                                .fill(Color.orange.opacity(0.9))
-                                .frame(width: 4, height: rodLength)
-                            Circle()
-                                .fill(Color.orange)
-                                .frame(width: 28, height: 28)
-                                .shadow(color: Color.black.opacity(0.12), radius: 6, y: 3)
-                        }
-                        .position(x: pivot.x, y: pivot.y + rodLength / 2)
-                        .rotationEffect(angle, anchor: .top)
-                        .overlay(alignment: .top) {
-                            Circle()
-                                .fill(Color.orange.opacity(0.9))
-                                .frame(width: 10, height: 10)
-                                .position(pivot)
-                        }
+                        // Pivot marker (not rotating).
+                        Circle()
+                            .fill(Color(.systemGray2))
+                            .frame(width: 10, height: 10)
+                            .overlay {
+                                Circle()
+                                    .stroke(Color.white.opacity(0.55), lineWidth: 1)
+                            }
+                            .position(pivot)
                     }
                 }
                 .padding(.horizontal, 16)
@@ -179,6 +190,66 @@ struct MetronomeView: View {
             }
             .offset(y: 85)
         }
+    }
+    
+    private func pendulumPhase(at date: Date) -> Double {
+        guard viewModel.isRunning, viewModel.style == .pendulum else { return -1 }
+        
+        let beat = max(0.12, viewModel.beatDurationSeconds)
+        // One beat is half a swing cycle (left -> right).
+        let period = beat * 2
+        let t = date.timeIntervalSince(pendulumStartDate)
+        // -1...+1 continuous oscillation.
+        return -cos((2 * Double.pi / period) * t)
+    }
+}
+
+private struct PendulumNeedleView: View {
+    let pivot: CGPoint
+    let angle: Angle
+    let rodLength: CGFloat
+    let rodWidth: CGFloat
+    let bobDiameter: CGFloat
+
+    var body: some View {
+        // Coordinate system for drawing:
+        // - pivot is the rotation center
+        // - rod spans from y = -rodLength (top) to y = 0 (pivot)
+        let topTipDiameter = max(6, rodWidth + 2)
+        let sliderWidth = max(18, bobDiameter)
+        let sliderHeight: CGFloat = 14
+        let sliderCenterY = -(rodLength * 2.0 / 3.0) // 1/3 down from the top
+
+        ZStack {
+            // Rod (silver)
+            RoundedRectangle(cornerRadius: 2)
+                .fill(Color(.systemGray3))
+                .frame(width: rodWidth, height: rodLength)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 2)
+                        .stroke(Color.white.opacity(0.35), lineWidth: 1)
+                }
+                .offset(y: -rodLength / 2)
+
+            // BPM slider weight (silver block on the rod)
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(Color(.systemGray2))
+                .frame(width: sliderWidth, height: sliderHeight)
+                .overlay {
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .stroke(Color.white.opacity(0.55), lineWidth: 1)
+                }
+                .shadow(color: Color.black.opacity(0.18), radius: 4, y: 2)
+                .offset(y: sliderCenterY)
+
+            // Small top tip
+            Circle()
+                .fill(Color(.systemGray4))
+                .frame(width: topTipDiameter, height: topTipDiameter)
+                .offset(y: -rodLength)
+        }
+        .rotationEffect(angle, anchor: .center)
+        .position(pivot)
     }
 }
 
