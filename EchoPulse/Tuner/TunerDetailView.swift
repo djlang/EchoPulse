@@ -27,16 +27,6 @@ struct TunerDetailView: View {
             TunerDashboardView(viewModel: detailVM)
             Spacer()
             
-            // 测试滑杆（暂时用来模拟频率变化，方便调试 UI）
-            VStack {
-                Text("模拟频率偏差测试")
-                    .font(.caption)
-                Slider(value: $detailVM.pitchOffset, in: -50...50)
-                    .accentColor(detailVM.statusColor)
-            }
-            .padding(40)
-            
-
             // 底部弦指示器 (这里可以用 HStack 渲染吉他的 6 根弦)
             HStack(spacing: 12) {
                 let notes = instrument.tuningNoteKeys

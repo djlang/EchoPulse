@@ -7,35 +7,47 @@
 
 import AudioKit
 import AudioKitEX
-import SoundpipeAudioKit // 提供高精度频率检测算法
+import SoundpipeAudioKit
 import Foundation
 import Combine
 import AVFAudio
 
 class TunerEngine: ObservableObject {
     private let engine = AudioEngine()
-    private var mic: AudioEngine.InputNode?
-    private var tappableNode: Fader? // 作为一个中间节点
+    private var silence: Fader?
     private var tracker: PitchTap?
     private var isRunning = false
 
-    // 回调给 ViewModel：(频率Hz, 音量Amplitude)
     var onPitchDetected: ((Float, Float) -> Void)?
 
     func start() {
         guard !isRunning else { return }
-        guard let input = engine.input else { return }
         
-        // 1. 设置输入并添加一个 Fader（音量设为0，防止回声啸叫）
+        let session = AVAudioSession.sharedInstance()
+        do {
+            // 关键：使用 .playAndRecord 并禁用回声消除等处理，以获得原始频率
+            try session.setCategory(.playAndRecord, mode: .measurement, options: [.defaultToSpeaker, .mixWithOthers])
+            try session.setActive(true)
+        } catch {
+            print("AVAudioSession 配置失败: \(error)")
+        }
+
+        guard let input = engine.input else { 
+            print("错误：无法获取麦克风输入节点")
+            return 
+        }
+        
+        // 1. 设置静音节点，防止由于麦克风采集到音箱输出导致的啸叫
         let fader = Fader(input)
         fader.gain = 0
-        self.tappableNode = fader
+        self.silence = fader
         engine.output = fader
 
         // 2. 初始化 PitchTap
-        tracker = PitchTap(fader) { [weak self] pitch, amp in
-            // pitch[0] 是检测到的主频率，amp[0] 是音量
-            if amp[0] > 0.1 { // 过滤背景噪音，只有声音够大才处理
+        // 注意：在 input 节点上监听，不受后面 fader 增益的影响
+        tracker = PitchTap(input) { [weak self] pitch, amp in
+            // 降低阈值到 0.05，让轻微的拨弦也能被检测到
+            if amp[0] > 0.05 {
                 self?.onPitchDetected?(pitch[0], amp[0])
             }
         }
@@ -45,6 +57,7 @@ class TunerEngine: ObservableObject {
             try engine.start()
             tracker?.start()
             isRunning = true
+            print("AudioKit 引擎已成功启动")
         } catch {
             print("AudioKit 引擎启动失败: \(error)")
         }
@@ -53,46 +66,27 @@ class TunerEngine: ObservableObject {
     func stop() {
         guard isRunning else { return }
         tracker?.stop()
-        tracker = nil
-        tappableNode = nil
         engine.stop()
         isRunning = false
+        print("AudioKit 引擎已停止")
     }
-}
-
-extension TunerEngine {
+    
+    // 权限检查逻辑保持不变...
     func checkMicPermission(completion: @escaping (Bool) -> Void) {
-        if #available(iOS 17.0, *) {
-            switch AVAudioApplication.shared.recordPermission {
-            case .granted:
-                completion(true)
-            case .denied:
-                completion(false)
-            case .undetermined:
-                AVAudioApplication.requestRecordPermission { granted in
-                    DispatchQueue.main.async {
-                        completion(granted)
-                    }
+        let session = AVAudioSession.sharedInstance()
+        switch session.recordPermission {
+        case .granted:
+            completion(true)
+        case .denied:
+            completion(false)
+        case .undetermined:
+            session.requestRecordPermission { granted in
+                DispatchQueue.main.async {
+                    completion(granted)
                 }
-            @unknown default:
-                completion(false)
             }
-        } else {
-            let session = AVAudioSession.sharedInstance()
-            switch session.recordPermission {
-            case .granted:
-                completion(true)
-            case .denied:
-                completion(false)
-            case .undetermined:
-                session.requestRecordPermission { granted in
-                    DispatchQueue.main.async {
-                        completion(granted)
-                    }
-                }
-            @unknown default:
-                completion(false)
-            }
+        @unknown default:
+            completion(false)
         }
     }
 }
